@@ -23,11 +23,102 @@
 #include "tbb_misc.h"
 #include "tbb/mythos.h"
 
+#ifdef MY_TRACING
+#include <iostream>
+#include <vector>
+#include <time.h>
+#include <atomic>
+#endif
+
 using rml::internal::thread_monitor;
 
 namespace tbb {
 namespace internal {
 namespace rml {
+
+#ifdef MY_TRACING
+class Logger{
+public:
+	Logger(const char* str)
+	: tail(nullptr)
+	, start_ns(0)
+	, name(str)
+	{
+		asm volatile ("":::"memory");
+		std::cerr << __func__ << std::endl;
+		struct timespec ts;	
+	        clock_gettime(CLOCK_MONOTONIC_RAW, &ts);
+	        start_ns =  (uint64_t)(ts.tv_sec)*1000000000 + ts.tv_nsec;
+		makeEvent(1);
+	}
+
+	~Logger(){
+		asm volatile ("":::"memory");
+		std::cerr << __func__ << std::endl;
+		makeEvent(-1);
+		asm volatile ("":::"memory");
+		printEvents();
+	}
+
+	void makeEvent(int delta){
+	    asm volatile ("":::"memory");
+	    struct timespec ts;	
+	    clock_gettime(CLOCK_MONOTONIC_RAW, &ts);
+	    uint64_t ns =  (uint64_t)(ts.tv_sec)*1000000000 + ts.tv_nsec;
+	    asm volatile ("":::"memory");
+	    Event* e = new Event(delta, ns);
+	    while(true){
+	    	e->next = tail.load();
+		if(std::atomic_compare_exchange_weak(&tail, &e->next, e)){
+			return;
+		}
+	    }
+	}
+	    
+	void printEvents(){
+		Event *t = std::atomic_exchange(&tail, nullptr);
+		Event *curr = t;
+		Event *head = nullptr;
+		while(curr){
+			Event *next = curr->next;
+			curr->next = head;
+			head = curr;
+			curr = next;
+		}
+
+		int numThreads = 0;
+		while(head){
+			Event* e = head;
+			numThreads = e->delta;
+			std::cout << "#TBB_" << name << " " << numThreads << " " << e->ns-start_ns << std::endl;
+
+			head = head->next;
+			delete e;
+		}
+	}
+
+private:
+    struct Event{
+
+	Event(int delta, uint64_t ns)
+	: delta(delta)
+	, ns(ns)
+	, next(nullptr)
+	{}
+
+    	int delta;
+	uint64_t ns;
+	Event* next;
+    };
+
+    std::atomic<Event*> tail;
+    uint64_t start_ns;
+    const char* name;
+};
+
+static Logger logger("THREADS");
+static Logger logger2("WORKER");
+#endif
 
 typedef thread_monitor::handle_type thread_handle;
 
@@ -181,6 +272,7 @@ private:
 
     friend class private_worker;
 public:
+
     private_server( tbb_client& client );
 
     version_type version() const __TBB_override {
@@ -280,6 +372,9 @@ void private_worker::run() {
       ++my_server.my_slack;
       my_server.remove_server_ref();
     }
+#ifdef MY_TRACING
+	logger2.makeEvent(1);
+#endif
     my_server.propagate_chain_reaction();
 
     // Transiting to st_normal here would require setting my_handle,
@@ -307,7 +402,13 @@ void private_worker::run() {
             my_thread_monitor.prepare_wait(c);
             // Check/set the invariant for sleeping
             if( my_state!=st_quit && my_server.try_insert_in_asleep_list(*this) ) {
+#ifdef MY_TRACING
+	logger2.makeEvent(-1);
+#endif
                 my_thread_monitor.commit_wait(c);
+#ifdef MY_TRACING
+	logger2.makeEvent(1);
+#endif
                 __TBB_ASSERT( my_state==st_quit || !my_next, "Thread monitor missed a spurious wakeup?" );
                 my_server.propagate_chain_reaction();
             } else {
@@ -320,6 +421,9 @@ void private_worker::run() {
 
     ++my_server.my_slack;
     my_server.remove_server_ref();
+#ifdef MY_TRACING
+	logger2.makeEvent(-1);
+#endif
 }
 
 inline void private_worker::wake_or_launch() {
@@ -377,6 +481,7 @@ private_server::private_server( tbb_client& client ) :
     my_stack_size(client.min_stack_size()),
     my_thread_array(NULL)
 {
+//std::cout << __func__ << std::endl; 
     my_ref_count = my_n_thread+1;
     my_slack = 0;
 #if TBB_USE_ASSERT
@@ -397,6 +502,7 @@ private_server::~private_server() {
         my_thread_array[i].~padded_private_worker();
     tbb::cache_aligned_allocator<padded_private_worker>().deallocate( my_thread_array, my_n_thread );
     tbb::internal::poison_pointer( my_thread_array );
+
 }
 
 inline bool private_server::try_insert_in_asleep_list( private_worker& t ) {
@@ -459,6 +565,10 @@ done:
 }
 
 void private_server::adjust_job_count_estimate( int delta ) {
+	//std::cout << __func__ << delta << std::endl;
+#ifdef MY_TRACING
+	logger.makeEvent(delta);
+#endif
 #if TBB_USE_ASSERT
     my_net_slack_requests+=delta;
 #endif /* TBB_USE_ASSERT */
