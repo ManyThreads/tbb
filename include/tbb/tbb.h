@@ -64,6 +64,7 @@
 #include "global_control.h"
 #include "iterators.h"
 #include "mutex.h"
+#include "mythos.h"
 #include "null_mutex.h"
 #include "null_rw_mutex.h"
 #include "parallel_do.h"

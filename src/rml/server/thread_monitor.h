@@ -113,6 +113,10 @@ public:
 
     //! Launch a thread
     static handle_type launch( thread_routine_type thread_routine, void* arg, size_t stack_size );
+
+    // mythos processor management
+    static bool revoke_demand(handle_type handle);
+
 #endif /* USE_PTHREAD */
 
     //! Yield control to OS
@@ -215,9 +219,18 @@ inline thread_monitor::handle_type thread_monitor::launch( void* (*thread_routin
     if( stack_size>0 )
         check(pthread_attr_setstacksize( &s, stack_size ), "pthread_attr_setstack_size" );
     pthread_t handle;
-    check( pthread_create( &handle, &s, thread_routine, arg ), "pthread_create" );
+    //check( pthread_create( &handle, &s, thread_routine, arg ), "pthread_create" );
+    auto res_create = mythos_pthread_create( &handle, &s, thread_routine, arg , CREATE_DEMAND);
+    //auto res_create = mythos_pthread_create( &handle, &s, thread_routine, arg , CREATE_FAIL);
+    if(res_create){
+      handle = 0;
+    }
     check( pthread_attr_destroy( &s ), "pthread_attr_destroy" );
     return handle;
+}
+
+bool thread_monitor::revoke_demand(handle_type handle){
+    return mythos_revoke_demand(handle);
 }
 
 void thread_monitor::join(handle_type handle) {
