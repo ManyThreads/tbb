@@ -64,6 +64,7 @@ TBB_CPLUS.OBJ = concurrent_hash_map.$(OBJ) \
 		task_group_context.$(OBJ) \
 		governor.$(OBJ) \
 		market.$(OBJ) \
+		mythos.$(OBJ) \
 		arena.$(OBJ) \
 		scheduler.$(OBJ) \
 		observer_proxy.$(OBJ) \

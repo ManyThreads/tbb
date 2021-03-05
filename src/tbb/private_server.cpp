@@ -21,6 +21,7 @@
 #include "scheduler_common.h"
 #include "governor.h"
 #include "tbb_misc.h"
+#include "tbb/mythos.h"
 
 using rml::internal::thread_monitor;
 
@@ -48,6 +49,8 @@ private:
         st_starting,
         //! Associated thread is doing normal life sequence.
         st_normal,
+        //! worker thread exiting due to dynamic threading
+        st_quitting,
         //! Associated thread has ended normal life sequence and promises to never touch *this again.
         st_quit
     };
@@ -159,6 +162,7 @@ private:
 
     //! Try to add t to list of sleeping workers
     bool try_insert_in_asleep_list( private_worker& t );
+    void insert_in_asleep_list( private_worker& t );
 
     //! Equivalent of adding additional_slack to my_slack and waking up to 2 threads if my_slack permits.
     void wake_some( int additional_slack );
@@ -245,13 +249,18 @@ void private_worker::start_shutdown() {
         // Do not need release handle in st_init state,
         // because in this case the thread wasn't started yet.
         // For st_starting release is done at launch site.
-        if (s==st_normal)
+        if (s==st_normal){
             release_handle(my_handle, governor::does_client_join_workers(my_client));
+        }
     } else if( s==st_init ) {
         // Perform action that otherwise would be performed by associated thread when it quits.
         my_server.remove_server_ref();
+    } else if(s==st_quitting){
+        release_handle(my_handle, governor::does_client_join_workers(my_client));
     }
+
 }
+
 
 void private_worker::run() {
     my_server.propagate_chain_reaction();
@@ -265,6 +274,17 @@ void private_worker::run() {
         if( my_server.my_slack>=0 ) {
             my_client.process(j);
         } else {
+            if(tbb::dynamicThreadingEnabled()){
+              if(my_state.compare_and_swap( st_quitting, st_normal )==st_normal){
+                  my_client.cleanup(j);
+                  my_server.remove_server_ref();
+                  my_server.insert_in_asleep_list(*this);  
+                  return;
+              }else{
+                  printf("dynamic worker mark quitting failed\n");
+              }
+            } 
+
             thread_monitor::cookie c;
             // Prepare to wait
             my_thread_monitor.prepare_wait(c);
@@ -286,6 +306,10 @@ void private_worker::run() {
 }
 
 inline void private_worker::wake_or_launch() {
+    if( my_state==st_quitting && my_state.compare_and_swap( st_init, st_quitting )==st_quitting ) {
+            release_handle(my_handle, governor::does_client_join_workers(my_client));
+    }
+
     if( my_state==st_init && my_state.compare_and_swap( st_starting, st_init )==st_init ) {
         // after this point, remove_server_ref() must be done by created thread
 #if USE_WINTHREAD
@@ -296,6 +320,12 @@ inline void private_worker::wake_or_launch() {
         fpa.protect_affinity_mask( /*restore_process_mask=*/true );
         my_handle = thread_monitor::launch( thread_routine, this, my_server.my_stack_size );
         // Implicit destruction of fpa resets original affinity mask.
+        }
+        //pthread_create failed
+        if(!my_handle){
+          my_state.store(st_init);
+          my_server.insert_in_asleep_list(*this);
+          return;
         }
 #endif /* USE_PTHREAD */
         state_t s = my_state.compare_and_swap( st_normal, st_starting );
@@ -359,6 +389,13 @@ inline bool private_server::try_insert_in_asleep_list( private_worker& t ) {
         --my_slack;
         return false;
     }
+}
+
+inline void private_server::insert_in_asleep_list( private_worker& t ){
+  asleep_list_mutex_type::scoped_lock lock(my_asleep_list_mutex);
+  my_slack++;
+  t.my_next = my_asleep_list_root;
+  my_asleep_list_root = &t;
 }
 
 void private_server::wake_some( int additional_slack ) {
