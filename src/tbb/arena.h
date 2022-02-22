@@ -459,8 +459,10 @@ inline void arena::on_thread_leaving ( ) {
     // because it can create the demand of workers,
     // but the arena can be already empty (and so ready for destroying)
     // TODO: Fix the race: while we check soft limit and it might be changed.
+    //if( ref_param==ref_external && my_num_slots != my_num_reserved_slots
+        //&& 0 == m->my_num_workers_soft_limit && !my_global_concurrency_mode ) {
     if( ref_param==ref_external && my_num_slots != my_num_reserved_slots
-        && 0 == m->my_num_workers_soft_limit && !my_global_concurrency_mode ) {
+        && !my_global_concurrency_mode ) {
         bool is_out = false;
         for (int i=0; i<num_priority_levels; i++) {
             is_out = is_out_of_work();
