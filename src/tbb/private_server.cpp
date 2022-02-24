@@ -294,19 +294,11 @@ void private_worker::run() {
             if(tbb::dynamicThreadingEnabled()){
               if(my_state.compare_and_swap( st_quitting, st_normal )==st_normal){
                   my_client.cleanup(j);
-<<<<<<< HEAD
-                  my_server.remove_server_ref();
-                  my_server.insert_in_asleep_list(*this);  
-                  return;
-              }else{
-                  printf("dynamic worker mark quitting failed\n");
-=======
                   //my_server.remove_server_ref();
                   my_server.insert_in_asleep_list(*this);  
                   return;
               }else{
                   //printf("dynamic worker mark quitting failed\n");
->>>>>>> c34f69a
               }
             } 
 
