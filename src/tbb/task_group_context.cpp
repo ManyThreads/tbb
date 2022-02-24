@@ -370,7 +370,7 @@ void generic_scheduler::propagate_task_group_state ( T task_group_context::*mptr
 
 template <typename T>
 bool market::propagate_task_group_state ( T task_group_context::*mptr_state, task_group_context& src, T new_state ) {
-    if ( !(src.my_state & task_group_context::may_have_children) )
+        if ( !(src.my_state & task_group_context::may_have_children) )
         return true;
     // The whole propagation algorithm is under the lock in order to ensure correctness
     // in case of concurrent state changes at the different levels of the context tree.
@@ -382,6 +382,8 @@ bool market::propagate_task_group_state ( T task_group_context::*mptr_state, tas
     // Advance global state propagation epoch
     __TBB_FetchAndAddWrelease(&the_context_state_propagation_epoch, 1);
     // Propagate to all workers and masters and sync up their local epochs with the global one
+    __TBB_ASSERT(false, NULL); //my_workers[] not set!!! fix it
+    assert(false);
     unsigned num_workers = my_first_unused_worker_idx;
     for ( unsigned i = 0; i < num_workers; ++i ) {
         generic_scheduler *s = my_workers[i];

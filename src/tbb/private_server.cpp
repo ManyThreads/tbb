@@ -256,6 +256,7 @@ void private_worker::start_shutdown() {
         // Perform action that otherwise would be performed by associated thread when it quits.
         my_server.remove_server_ref();
     } else if(s==st_quitting){
+        my_server.remove_server_ref();
         release_handle(my_handle, governor::does_client_join_workers(my_client));
     }
 
@@ -277,11 +278,11 @@ void private_worker::run() {
             if(tbb::dynamicThreadingEnabled()){
               if(my_state.compare_and_swap( st_quitting, st_normal )==st_normal){
                   my_client.cleanup(j);
-                  my_server.remove_server_ref();
+                  //my_server.remove_server_ref();
                   my_server.insert_in_asleep_list(*this);  
                   return;
               }else{
-                  printf("dynamic worker mark quitting failed\n");
+                  //printf("dynamic worker mark quitting failed\n");
               }
             } 
 
