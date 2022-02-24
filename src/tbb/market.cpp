@@ -679,7 +679,7 @@ void market::process( job& j ) {
 }
 
 void market::cleanup( job& j ) {
-    __TBB_ASSERT( theMarket != this, NULL );
+    //__TBB_ASSERT( theMarket != this, NULL );
     generic_scheduler& s = static_cast<generic_scheduler&>(j);
     generic_scheduler* mine = governor::local_scheduler_if_initialized();
     __TBB_ASSERT( !mine || mine->is_worker(), NULL );
@@ -698,6 +698,7 @@ void market::acknowledge_close_connection() {
 
 ::rml::job* market::create_one_job() {
     unsigned index = ++my_first_unused_worker_idx;
+    index = (index % my_num_workers_hard_limit) + 1;
     __TBB_ASSERT( index > 0, NULL );
     ITT_THREAD_SET_NAME(_T("TBB Worker Thread"));
     // index serves as a hint decreasing conflicts between workers when they migrate between arenas
@@ -705,7 +706,7 @@ void market::acknowledge_close_connection() {
 #if __TBB_TASK_GROUP_CONTEXT
     __TBB_ASSERT( index <= my_num_workers_hard_limit, NULL );
     __TBB_ASSERT( !my_workers[index - 1], NULL );
-    my_workers[index - 1] = s;
+    //my_workers[index - 1] = s;
 #endif /* __TBB_TASK_GROUP_CONTEXT */
     return s;
 }

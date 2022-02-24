@@ -263,10 +263,10 @@ void private_worker::start_shutdown() {
           //revoke failed
           my_thread_monitor.notify();
           release_handle(my_handle, governor::does_client_join_workers(my_client));
-        }else{
-          my_server.remove_server_ref();
         }
+        my_server.remove_server_ref();
     } else if(s==st_quitting){
+        my_server.remove_server_ref();
         release_handle(my_handle, governor::does_client_join_workers(my_client));
     }
 
@@ -294,11 +294,19 @@ void private_worker::run() {
             if(tbb::dynamicThreadingEnabled()){
               if(my_state.compare_and_swap( st_quitting, st_normal )==st_normal){
                   my_client.cleanup(j);
+<<<<<<< HEAD
                   my_server.remove_server_ref();
                   my_server.insert_in_asleep_list(*this);  
                   return;
               }else{
                   printf("dynamic worker mark quitting failed\n");
+=======
+                  //my_server.remove_server_ref();
+                  my_server.insert_in_asleep_list(*this);  
+                  return;
+              }else{
+                  //printf("dynamic worker mark quitting failed\n");
+>>>>>>> c34f69a
               }
             } 
 

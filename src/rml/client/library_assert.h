@@ -23,7 +23,7 @@
 #else
 #include <assert.h>
 #define LIBRARY_ASSERT(x,y)         assert(x)
-#define __TBB_DYNAMIC_LOAD_ENABLED  1
+#define __TBB_DYNAMIC_LOAD_ENABLED  0
 #endif
 #endif /* LIBRARY_ASSERT */
 

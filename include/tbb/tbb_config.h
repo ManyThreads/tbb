@@ -522,7 +522,7 @@ There are four cases that are supported:
 
 /** __TBB_DYNAMIC_LOAD_ENABLED describes the system possibility to load shared libraries at run time **/
 #ifndef __TBB_DYNAMIC_LOAD_ENABLED
-    #define __TBB_DYNAMIC_LOAD_ENABLED 1
+    #define __TBB_DYNAMIC_LOAD_ENABLED 0
 #endif
 
 /** __TBB_SOURCE_DIRECTLY_INCLUDED is a mode used in whitebox testing when
